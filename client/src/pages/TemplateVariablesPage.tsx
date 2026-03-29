@@ -9,7 +9,7 @@ const PAGE_SIZE = 20;
 export function TemplateVariablesPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { refreshList } = useOutletContext<LayoutContext>();
+  const { refreshTemplates: refreshList } = useOutletContext<LayoutContext>();
 
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [loading, setLoading] = useState(true);

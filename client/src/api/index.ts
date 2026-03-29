@@ -1,6 +1,7 @@
 import {
   ConnectorConfig,
   PeriodSnapshot,
+  ReportRecord,
   RenderResponse,
   TemplateDetail,
   TemplateSummary,
@@ -126,6 +127,8 @@ export const templates = {
 };
 
 export const reports = {
+  history: () => request<ReportRecord[]>('/reports/history'),
+
   render: (templateId: string, periodKey: string, forceRefresh = false) =>
     request<RenderResponse>('/reports/render', {
       method: 'POST',
@@ -133,8 +136,23 @@ export const reports = {
       body: JSON.stringify({ templateId, periodKey, forceRefresh }),
     }),
 
-  exportUrl: (templateId: string, periodKey: string, forceRefresh = false) =>
-    `${BASE}/reports/${templateId}/export?periodKey=${encodeURIComponent(periodKey)}${
-      forceRefresh ? '&forceRefresh=1' : ''
-    }`,
+  export: async (templateId: string, periodKey: string, forceRefresh = false) => {
+    const res = await fetch(
+      `${BASE}/reports/${templateId}/export?periodKey=${encodeURIComponent(periodKey)}${
+        forceRefresh ? '&forceRefresh=1' : ''
+      }`
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Export failed');
+    }
+
+    const disposition = res.headers.get('content-disposition') || '';
+    const filenameMatch = disposition.match(/filename="([^"]+)"/);
+    return {
+      blob: await res.blob(),
+      filename: filenameMatch ? decodeURIComponent(filenameMatch[1]) : `${templateId}-${periodKey}.docx`,
+    };
+  },
 };

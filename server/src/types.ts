@@ -15,6 +15,7 @@ export type ConnectorMode = 'mock' | 'http';
 export type SnapshotSourceKind = 'mock' | 'fetched';
 
 export type RenderSource = 'cache' | 'mock' | 'live';
+export type ReportAction = 'preview' | 'export';
 
 export interface TemplateSummary {
   id: string;
@@ -23,6 +24,7 @@ export interface TemplateSummary {
   description: string;
   periodType: PeriodType;
   sourceDocPath: string;
+  sourceDocAvailable: boolean;
   variableCount: number;
   candidateCount: number;
   createdAt: string;
@@ -125,4 +127,18 @@ export interface RenderResponse {
   cachedAt: string | null;
   periodKey: string;
   periodLabel: string;
+}
+
+export interface ReportRecord {
+  id: string;
+  templateId: string;
+  templateName: string;
+  periodKey: string;
+  periodLabel: string;
+  source: RenderSource;
+  lastAction: ReportAction;
+  previewCount: number;
+  exportCount: number;
+  createdAt: string;
+  updatedAt: string;
 }

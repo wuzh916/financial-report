@@ -75,7 +75,7 @@ export function TemplateEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
-  const { refreshList, tplList } = useOutletContext<LayoutContext>();
+  const { refreshTemplates: refreshList, tplList } = useOutletContext<LayoutContext>();
 
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('variables');
@@ -757,6 +757,12 @@ export function TemplateEdit() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => navigate(`/templates/${template.id}/data`)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-primary hover:text-primary"
+            >
+              数据绑定
+            </button>
+            <button
               onClick={() => navigate(`/templates/${template.id}/variables`)}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-primary hover:text-primary"
             >
@@ -888,22 +894,22 @@ export function TemplateEdit() {
           )}
         </section>
 
-        <section className="flex-[2] min-w-[420px] max-w-[520px] border-l border-gray-100 bg-white flex flex-col">
-          <div className="flex border-b border-gray-100">
-            {tabs.map((tab) => (
+        <section className="flex-[1.45] min-w-[360px] max-w-[460px] border-l border-gray-100 bg-white flex flex-col">
+          <div className="border-b border-gray-100 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">当前变量</div>
+                <p className="mt-1 text-xs leading-6 text-slate-500">
+                  这页只负责文档里的变量标注与命名，接口、样例数据和字段映射已移到独立的数据绑定页。
+                </p>
+              </div>
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-400 hover:text-gray-700'
-                }`}
+                onClick={() => navigate(`/templates/${template.id}/data`)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
               >
-                <span className="material-symbols-outlined text-sm">{tab.icon}</span>
-                {tab.label}
+                去数据绑定
               </button>
-            ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">

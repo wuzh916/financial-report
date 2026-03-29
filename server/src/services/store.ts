@@ -1,8 +1,12 @@
 import { v4 as uuid } from 'uuid';
 import { db } from './db.js';
+import { existsSync } from 'fs';
 import {
   ConnectorConfig,
   PeriodSnapshot,
+  ReportAction,
+  ReportRecord,
+  RenderSource,
   SnapshotSourceKind,
   TemplateCandidate,
   TemplateDetail,
@@ -88,6 +92,20 @@ type SnapshotRow = {
   period_label: string;
   payload_json: string;
   source_kind: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ReportRecordRow = {
+  id: string;
+  template_id: string;
+  template_name: string;
+  period_key: string;
+  period_label: string;
+  source: string;
+  last_action: string;
+  preview_count: number;
+  export_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -563,6 +581,93 @@ export function listSnapshots(templateId: string): PeriodSnapshot[] {
     .all(templateId) as SnapshotRow[]).map(toSnapshot);
 }
 
+export function listReportRecords(): ReportRecord[] {
+  return (db
+    .prepare(`
+      SELECT
+        r.*,
+        t.name AS template_name
+      FROM report_records r
+      INNER JOIN templates t ON t.id = r.template_id
+      ORDER BY datetime(r.updated_at) DESC
+    `)
+    .all() as ReportRecordRow[]).map(toReportRecord);
+}
+
+export function upsertReportRecord(data: {
+  templateId: string;
+  periodKey: string;
+  periodLabel: string;
+  source: RenderSource;
+  action: ReportAction;
+}): ReportRecord {
+  const existing = db
+    .prepare(`
+      SELECT
+        r.*,
+        t.name AS template_name
+      FROM report_records r
+      INNER JOIN templates t ON t.id = r.template_id
+      WHERE r.template_id = ? AND r.period_key = ?
+    `)
+    .get(data.templateId, data.periodKey) as ReportRecordRow | undefined;
+
+  const now = new Date().toISOString();
+  const row = {
+    id: existing?.id ?? uuid(),
+    templateId: data.templateId,
+    periodKey: data.periodKey,
+    periodLabel: data.periodLabel,
+    source: data.source,
+    lastAction: data.action,
+    previewCount: Number(existing?.preview_count ?? 0) + (data.action === 'preview' ? 1 : 0),
+    exportCount: Number(existing?.export_count ?? 0) + (data.action === 'export' ? 1 : 0),
+    createdAt: existing?.created_at ?? now,
+    updatedAt: now,
+  } satisfies Omit<ReportRecord, 'templateName'>;
+
+  db.prepare(`
+    INSERT INTO report_records (
+      id, template_id, period_key, period_label, source, last_action, preview_count, export_count, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(template_id, period_key) DO UPDATE SET
+      period_label = excluded.period_label,
+      source = excluded.source,
+      last_action = excluded.last_action,
+      preview_count = excluded.preview_count,
+      export_count = excluded.export_count,
+      updated_at = excluded.updated_at
+  `).run(
+    row.id,
+    row.templateId,
+    row.periodKey,
+    row.periodLabel,
+    row.source,
+    row.lastAction,
+    row.previewCount,
+    row.exportCount,
+    row.createdAt,
+    row.updatedAt
+  );
+
+  return getReportRecordById(row.id)!;
+}
+
+export function getReportRecordById(id: string): ReportRecord | null {
+  const row = db
+    .prepare(`
+      SELECT
+        r.*,
+        t.name AS template_name
+      FROM report_records r
+      INNER JOIN templates t ON t.id = r.template_id
+      WHERE r.id = ?
+    `)
+    .get(id) as ReportRecordRow | undefined;
+
+  return row ? toReportRecord(row) : null;
+}
+
 export function upsertSnapshot(data: {
   id?: string;
   templateId: string;
@@ -759,6 +864,7 @@ function toTemplateSummary(row: TemplateRow): TemplateSummary {
     description: row.description,
     periodType: row.period_type as TemplateSummary['periodType'],
     sourceDocPath: row.source_doc_path,
+    sourceDocAvailable: Boolean(row.source_doc_path) && existsSync(row.source_doc_path),
     variableCount: Number(row.variable_count ?? 0),
     candidateCount: Number(row.candidate_count ?? 0),
     createdAt: row.created_at,
@@ -851,6 +957,22 @@ function toSnapshot(row: SnapshotRow): PeriodSnapshot {
     periodLabel: row.period_label,
     payload: JSON.parse(row.payload_json),
     sourceKind: row.source_kind as SnapshotSourceKind,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toReportRecord(row: ReportRecordRow): ReportRecord {
+  return {
+    id: row.id,
+    templateId: row.template_id,
+    templateName: row.template_name,
+    periodKey: row.period_key,
+    periodLabel: row.period_label,
+    source: row.source as RenderSource,
+    lastAction: row.last_action as ReportAction,
+    previewCount: Number(row.preview_count ?? 0),
+    exportCount: Number(row.export_count ?? 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

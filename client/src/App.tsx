@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { TemplateEdit } from './pages/TemplateEdit';
+import { TemplateDataPage } from './pages/TemplateDataPage';
 import { TemplateVariablesPage } from './pages/TemplateVariablesPage';
 import { ReportCenter } from './pages/ReportCenter';
 import { useOutletContext } from 'react-router-dom';
@@ -27,6 +28,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<ReportCenter />} />
         <Route path="/templates" element={<TemplateIndex />} />
+        <Route path="/templates/:id/data" element={<TemplateDataPage />} />
         <Route path="/templates/:id/variables" element={<TemplateVariablesPage />} />
         <Route path="/templates/:id" element={<TemplateEdit />} />
       </Route>

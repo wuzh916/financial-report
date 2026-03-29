@@ -16,6 +16,15 @@ class ReportRouteError extends Error {
   }
 }
 
+router.get('/history', (_req: Request, res: Response) => {
+  try {
+    res.json(store.listReportRecords());
+  } catch (error) {
+    console.error('List report history failed:', error);
+    res.status(500).json({ error: '获取报告记录失败' });
+  }
+});
+
 router.post('/render', async (req: Request, res: Response) => {
   try {
     const { templateId, periodKey, forceRefresh } = req.body;
@@ -49,6 +58,14 @@ router.post('/render', async (req: Request, res: Response) => {
       periodLabel: payloadResult.periodLabel,
     };
 
+    store.upsertReportRecord({
+      templateId: template.id,
+      periodKey,
+      periodLabel: payloadResult.periodLabel,
+      source: payloadResult.source,
+      action: 'preview',
+    });
+
     res.json(response);
   } catch (error) {
     console.error('Render report failed:', error);
@@ -79,6 +96,14 @@ router.get('/:id/export', async (req: Request, res: Response) => {
     const mapping = buildVariableMapping(template, payloadResult.payload);
     const buffer = await renderTemplateBuffer(template.sourceDocPath, template.paragraphs, mapping);
     const filename = `${template.name}-${payloadResult.periodLabel}.docx`;
+
+    store.upsertReportRecord({
+      templateId,
+      periodKey,
+      periodLabel: payloadResult.periodLabel,
+      source: payloadResult.source,
+      action: 'export',
+    });
 
     res.setHeader(
       'Content-Type',

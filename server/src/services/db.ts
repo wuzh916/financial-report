@@ -98,7 +98,22 @@ db.exec(`
     source_kind TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    UNIQUE (template_id, period_key, source_kind),
+      UNIQUE (template_id, period_key, source_kind),
+      FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE
+    );
+
+  CREATE TABLE IF NOT EXISTS report_records (
+    id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    period_key TEXT NOT NULL,
+    period_label TEXT NOT NULL,
+    source TEXT NOT NULL,
+    last_action TEXT NOT NULL,
+    preview_count INTEGER NOT NULL DEFAULT 0,
+    export_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (template_id, period_key),
     FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE
   );
 `);

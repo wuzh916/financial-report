@@ -1,24 +1,29 @@
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
-import { templates } from '../api';
-import { TemplateSummary } from '../types';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { reports, templates } from '../api';
+import { ReportRecord, TemplateSummary } from '../types';
 
 export interface LayoutContext {
-  refreshList: () => void;
+  refreshTemplates: () => void;
+  refreshReports: () => void;
   tplList: TemplateSummary[];
+  reportList: ReportRecord[];
   selectedTplId: string;
+  selectedReportId: string;
 }
 
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [tplList, setTplList] = useState<TemplateSummary[]>([]);
+  const [reportList, setReportList] = useState<ReportRecord[]>([]);
   const [selectedTplId, setSelectedTplId] = useState('');
+  const [selectedReportId, setSelectedReportId] = useState('');
 
   const isReportCenter = location.pathname === '/';
   const isTemplateMgmt = location.pathname.startsWith('/templates');
 
-  const refreshList = useCallback(async () => {
+  const refreshTemplates = useCallback(async () => {
     try {
       const list = await templates.list();
       setTplList(list);
@@ -30,65 +35,90 @@ export function Layout() {
     }
   }, [selectedTplId]);
 
-  useEffect(() => {
-    refreshList();
-  }, [refreshList]);
+  const refreshReports = useCallback(async () => {
+    try {
+      const list = await reports.history();
+      setReportList(list);
+      if (list.length > 0 && !selectedReportId) {
+        setSelectedReportId(list[0].id);
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedReportId]);
 
-  // Sync selectedTplId with URL when on template edit page
+  useEffect(() => {
+    refreshTemplates();
+    refreshReports();
+  }, [refreshReports, refreshTemplates]);
+
   useEffect(() => {
     const match = location.pathname.match(/^\/templates\/([^/]+)(?:\/.*)?$/);
     if (match && match[1] !== selectedTplId) {
       setSelectedTplId(match[1]);
     }
-  }, [location.pathname]);
+  }, [location.pathname, selectedTplId]);
+
+  useEffect(() => {
+    if (reportList.length === 0) {
+      if (selectedReportId) {
+        setSelectedReportId('');
+      }
+      return;
+    }
+
+    if (!reportList.some((item) => item.id === selectedReportId)) {
+      setSelectedReportId(reportList[0].id);
+    }
+  }, [reportList, selectedReportId]);
 
   const handleCreate = async () => {
-    const t = await templates.create({ name: '新建模板' });
-    await refreshList();
-    setSelectedTplId(t.id);
-    navigate(`/templates/${t.id}`);
+    const created = await templates.create({ name: '新建模板' });
+    await refreshTemplates();
+    setSelectedTplId(created.id);
+    navigate(`/templates/${created.id}`);
   };
 
   const handleTemplateClick = (id: string) => {
     setSelectedTplId(id);
+    navigate(`/templates/${id}`);
+  };
+
+  const handleReportClick = (id: string) => {
+    setSelectedReportId(id);
     if (!isReportCenter) {
-      navigate(`/templates/${id}`);
+      navigate('/');
     }
   };
 
-  const isActiveTemplate = (id: string) => {
-    if (isReportCenter) return selectedTplId === id;
-    return location.pathname === `/templates/${id}` || location.pathname.startsWith(`/templates/${id}/`);
-  };
+  const isActiveTemplate = (id: string) =>
+    location.pathname === `/templates/${id}` || location.pathname.startsWith(`/templates/${id}/`);
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200/60">
-        {/* App title */}
-        <div className="px-5 pt-6 pb-5">
+      <aside className="flex w-64 flex-shrink-0 flex-col border-r border-gray-200/60 bg-white">
+        <div className="px-5 pb-5 pt-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-white text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <span className="material-symbols-outlined text-lg text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
                 analytics
               </span>
             </div>
             <div>
-              <div className="text-sm font-bold text-gray-800 leading-tight">财务报告管理系统</div>
+              <div className="text-sm font-bold leading-tight text-gray-800">财务报告管理系统</div>
               <div className="text-[10px] text-gray-400">Financial Report System</div>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="px-3 space-y-1">
+        <nav className="space-y-1 px-3">
           <NavLink
             to="/"
             end
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary/10 text-primary font-semibold'
+                  ? 'bg-primary/10 font-semibold text-primary'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
               }`
             }
@@ -99,9 +129,9 @@ export function Layout() {
           <NavLink
             to="/templates"
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary/10 text-primary font-semibold'
+                  ? 'bg-primary/10 font-semibold text-primary'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
               }`
             }
@@ -111,34 +141,61 @@ export function Layout() {
           </NavLink>
         </nav>
 
-        {/* Template list in sidebar */}
-        <div className="flex-1 flex flex-col overflow-hidden mt-4 pt-4 border-t border-gray-100">
-          <div className="px-5 mb-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              {isReportCenter ? '报告列表' : '模板列表'}
+        <div className="mt-4 flex flex-1 flex-col overflow-hidden border-t border-gray-100 pt-4">
+          <div className="mb-2 px-5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              {isReportCenter ? '最近报告' : '模板列表'}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-1 px-3 hide-scrollbar">
-            {tplList.length === 0 ? (
-              <div className="px-2 py-4 text-center text-xs text-gray-400">
-                {isReportCenter ? '暂无报告' : '暂无模板'}
-              </div>
+
+          <div className="hide-scrollbar flex-1 overflow-y-auto space-y-1 px-3">
+            {isReportCenter ? (
+              reportList.length === 0 ? (
+                <div className="px-2 py-4 text-center text-xs leading-6 text-gray-400">暂无报告记录</div>
+              ) : (
+                reportList.map((report) => {
+                  const isActive = selectedReportId === report.id;
+
+                  return (
+                    <div
+                      key={report.id}
+                      onClick={() => handleReportClick(report.id)}
+                      className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-all ${
+                        isActive
+                          ? 'border-blue-200/60 bg-blue-50 shadow-sm'
+                          : 'border-transparent hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`truncate text-xs font-semibold ${isActive ? 'text-blue-700' : 'text-gray-700'}`}>
+                        {report.templateName}
+                      </div>
+                      <div className={`mt-1 flex items-center gap-1.5 text-[10px] ${isActive ? 'text-blue-500' : 'text-gray-400'}`}>
+                        <span>{report.periodLabel}</span>
+                        <span>·</span>
+                        <span>{report.lastAction === 'export' ? '已导出' : '已预览'}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            ) : tplList.length === 0 ? (
+              <div className="px-2 py-4 text-center text-xs text-gray-400">暂无模板</div>
             ) : (
-              tplList.map((t) => (
+              tplList.map((template) => (
                 <div
-                  key={t.id}
-                  onClick={() => handleTemplateClick(t.id)}
-                  className={`px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
-                    isActiveTemplate(t.id)
-                      ? 'bg-blue-50 border border-blue-200/60 shadow-sm'
-                      : 'hover:bg-gray-50 border border-transparent'
+                  key={template.id}
+                  onClick={() => handleTemplateClick(template.id)}
+                  className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-all ${
+                    isActiveTemplate(template.id)
+                      ? 'border-blue-200/60 bg-blue-50 shadow-sm'
+                      : 'border-transparent hover:bg-gray-50'
                   }`}
                 >
-                  <div className={`text-xs font-semibold truncate ${isActiveTemplate(t.id) ? 'text-blue-700' : 'text-gray-700'}`}>
-                    {t.name}
+                  <div className={`truncate text-xs font-semibold ${isActiveTemplate(template.id) ? 'text-blue-700' : 'text-gray-700'}`}>
+                    {template.name}
                   </div>
-                  <div className={`text-[10px] mt-0.5 ${isActiveTemplate(t.id) ? 'text-blue-500' : 'text-gray-400'}`}>
-                    {t.variableCount > 0 ? `${t.variableCount} 个变量` : '未配置变量'}
+                  <div className={`mt-0.5 text-[10px] ${isActiveTemplate(template.id) ? 'text-blue-500' : 'text-gray-400'}`}>
+                    {template.variableCount > 0 ? `${template.variableCount} 个变量` : '未配置变量'}
                   </div>
                 </div>
               ))
@@ -146,12 +203,11 @@ export function Layout() {
           </div>
         </div>
 
-        {/* Create button - only show in Template Management */}
         {isTemplateMgmt && (
           <div className="p-3">
             <button
               onClick={handleCreate}
-              className="w-full py-2 bg-primary text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 hover:bg-primary-light transition-colors text-xs"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-light"
             >
               <span className="material-symbols-outlined text-sm">add</span>
               新建模板
@@ -160,9 +216,19 @@ export function Layout() {
         )}
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 overflow-hidden">
-        <Outlet context={{ refreshList, tplList, selectedTplId } satisfies LayoutContext} />
+        <Outlet
+          context={
+            {
+              refreshTemplates,
+              refreshReports,
+              tplList,
+              reportList,
+              selectedTplId,
+              selectedReportId,
+            } satisfies LayoutContext
+          }
+        />
       </div>
     </div>
   );
